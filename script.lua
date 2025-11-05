@@ -1,12 +1,16 @@
-
+-- Library Link
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Robojini/Tuturial_UI_Library/main/UI_Template_1"))()
 
+-- Create UI Window
 local Window = Library.CreateLib("AutoFarm", "RJTheme3")
 
+-- Tab
 local Tab = Window:NewTab("Main")
 
+-- Section
 local Section = Tab:NewSection("Auto Farm Settings")
 
+-- Variables
 local autoFarmEnabled = false
 local farmConnection
 local maxBackpack = 0
@@ -14,11 +18,13 @@ local currentPhase = "MINING" -- MINING, PROCESSING, BUILDING
 local eHeld = false
 local eConnection
 
+-- Text box for max backpack input
 Section:NewTextBox("Max Backpack", "Enter maximum backpack capacity", function(txt)
     maxBackpack = tonumber(txt) or 0
     print("Max backpack set: " .. maxBackpack)
 end)
 
+-- Function to get resources
 local function getResources()
     local player = game.Players.LocalPlayer
     local stones = player:FindFirstChild("Stones")
@@ -30,12 +36,14 @@ local function getResources()
     return stoneValue, brickValue
 end
 
+-- Function to check if backpack is full
 local function isBackpackFull()
     local stone, brick = getResources()
     local total = stone + brick
     return total >= maxBackpack
 end
 
+-- Function to hold E (rapid press instead of hold)
 local function startRapidE()
     if eConnection then
         eConnection:Disconnect()
@@ -49,6 +57,7 @@ local function startRapidE()
     eHeld = true
 end
 
+-- Function to stop rapid E
 local function stopRapidE()
     if eConnection then
         eConnection:Disconnect()
@@ -57,6 +66,7 @@ local function stopRapidE()
     eHeld = false
 end
 
+-- Function to teleport to saw coordinates
 local function teleportToSawCoordinates()
     local character = game.Players.LocalPlayer.Character
     if character and character:FindFirstChild("HumanoidRootPart") then
@@ -71,6 +81,7 @@ local function teleportToSawCoordinates()
     return false
 end
 
+-- Function to teleport to stone
 local function teleportToStone()
     local character = game.Players.LocalPlayer.Character
     if character and character:FindFirstChild("HumanoidRootPart") then
@@ -85,22 +96,24 @@ local function teleportToStone()
     return false
 end
 
+-- Function to process ALL stones with rapid E
 local function processAllStones()
     local stone, brick = getResources()
     
     if stone > 0 then
         if teleportToSawCoordinates() then
-            startRapidE()
-            return true
+            startRapidE() -- Быстро нажимаем E пока есть камни
+            return true -- Still processing
         end
     else
-        stopRapidE()
-        currentPhase = "BUILDING" left
-        return false
+        stopRapidE() -- Останавливаем когда камней нет
+        currentPhase = "BUILDING" -- Switch to building when no stones left
+        return false -- Done processing
     end
     return true
 end
 
+-- Function to build ALL bricks
 local function buildAllBricks()
     local stone, brick = getResources()
     
@@ -108,14 +121,15 @@ local function buildAllBricks()
         pcall(function()
             game:GetService("ReplicatedStorage").Place:InvokeServer(workspace.Floors.Base.Example.Part)
         end)
-        return true
+        return true -- Still building
     else
-        currentPhase = "MINING"  bricks left
-        return false 
+        currentPhase = "MINING" -- Switch back to mining when no bricks left
+        return false -- Done building
     end
     return true
 end
 
+-- Main auto farm function
 local function startAutoFarm()
     autoFarmEnabled = true
     
@@ -138,14 +152,16 @@ local function startAutoFarm()
                     end)
                 end
             else
-                currentPhase = "PROCESSING" 
+                currentPhase = "PROCESSING" -- Switch to processing when full
             end
             
         elseif currentPhase == "PROCESSING" then
+            -- Process ALL stones first with rapid E
             processAllStones()
             
         elseif currentPhase == "BUILDING" then
-            stopRapidE()
+            stopRapidE() -- Останавливаем E при строительстве
+            -- Build ALL bricks
             buildAllBricks()
         end
         
@@ -153,15 +169,18 @@ local function startAutoFarm()
     end)
 end
 
+-- Stop function
 local function stopAutoFarm()
     autoFarmEnabled = false
-    stopRapidE() 
+    stopRapidE() -- Останавливаем E при остановке
     if farmConnection then
         farmConnection:Disconnect()
         farmConnection = nil
     end
     currentPhase = "MINING"
 end
+
+-- Toggle button for auto farm
 Section:NewToggle("Auto Farm", "Enable smart auto farm", function(state)
     if state then
         if maxBackpack == 0 then
@@ -174,11 +193,14 @@ Section:NewToggle("Auto Farm", "Enable smart auto farm", function(state)
     end
 end)
 
+-- Info section
 local InfoSection = Tab:NewSection("Resource Info")
 
+-- Label for resource display
 local resourceText = "Loading..."
 local resourceLabel = InfoSection:NewLabel(resourceText)
 
+-- Resource info update
 game:GetService("RunService").Heartbeat:Connect(function()
     local stone, brick = getResources()
     local total = stone + brick
@@ -203,6 +225,7 @@ game:GetService("RunService").Heartbeat:Connect(function()
     resourceLabel:UpdateLabel(resourceText)
 end)
 
+-- Manual controls section
 local ManualSection = Tab:NewSection("Manual Controls")
 
 ManualSection:NewButton("Start Rapid E at Saw", "Teleport to saw and RAPID E", function()
@@ -231,4 +254,4 @@ ManualSection:NewButton("Build Part", "Build part", function()
     end)
 end)
 
-print ("it was hot fix if not work im idk")
+print("AutoFarm loaded! Set max backpack capacity first.")
