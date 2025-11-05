@@ -1,3 +1,4 @@
+
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Robojini/Tuturial_UI_Library/main/UI_Template_1"))()
 
 local Window = Library.CreateLib("AutoFarm", "RJTheme3")
@@ -9,6 +10,9 @@ local Section = Tab:NewSection("Auto Farm Settings")
 local autoFarmEnabled = false
 local farmConnection
 local maxBackpack = 0
+local currentPhase = "MINING" -- MINING, PROCESSING, BUILDING
+local eHeld = false
+local eConnection
 
 Section:NewTextBox("Max Backpack", "Enter maximum backpack capacity", function(txt)
     maxBackpack = tonumber(txt) or 0
@@ -32,10 +36,25 @@ local function isBackpackFull()
     return total >= maxBackpack
 end
 
-local function pressE()
-    local virtualInput = game:GetService("VirtualInputManager")
-    virtualInput:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-    virtualInput:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+local function startRapidE()
+    if eConnection then
+        eConnection:Disconnect()
+    end
+    
+    eConnection = game:GetService("RunService").Heartbeat:Connect(function()
+        local virtualInput = game:GetService("VirtualInputManager")
+        virtualInput:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+        virtualInput:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    end)
+    eHeld = true
+end
+
+local function stopRapidE()
+    if eConnection then
+        eConnection:Disconnect()
+        eConnection = nil
+    end
+    eHeld = false
 end
 
 local function teleportToSawCoordinates()
@@ -66,6 +85,37 @@ local function teleportToStone()
     return false
 end
 
+local function processAllStones()
+    local stone, brick = getResources()
+    
+    if stone > 0 then
+        if teleportToSawCoordinates() then
+            startRapidE()
+            return true
+        end
+    else
+        stopRapidE()
+        currentPhase = "BUILDING" left
+        return false
+    end
+    return true
+end
+
+local function buildAllBricks()
+    local stone, brick = getResources()
+    
+    if brick > 0 then
+        pcall(function()
+            game:GetService("ReplicatedStorage").Place:InvokeServer(workspace.Floors.Base.Example.Part)
+        end)
+        return true
+    else
+        currentPhase = "MINING"  bricks left
+        return false 
+    end
+    return true
+end
+
 local function startAutoFarm()
     autoFarmEnabled = true
     
@@ -77,44 +127,41 @@ local function startAutoFarm()
         
         local stone, brick = getResources()
         
-        -- Check if backpack is full
-        if isBackpackFull() then
-            print("Backpack full! Cannot add more resources")
-            return
+        -- Phase logic
+        if currentPhase == "MINING" then
+            stopRapidE() -- Останавливаем E при майнинге
+            -- Mine until backpack is full
+            if not isBackpackFull() then
+                if teleportToStone() then
+                    pcall(function()
+                        game:GetService("ReplicatedStorage").KickStone:InvokeServer(true)
+                    end)
+                end
+            else
+                currentPhase = "PROCESSING" 
+            end
+            
+        elseif currentPhase == "PROCESSING" then
+            processAllStones()
+            
+        elseif currentPhase == "BUILDING" then
+            stopRapidE()
+            buildAllBricks()
         end
         
-        if stone > 0 then
-            -- If has stones, process them at coordinates
-            if teleportToSawCoordinates() then
-                pressE()
-                wait(0.1)
-            end
-        else
-            -- If no stones, farm new ones
-            if teleportToStone() then
-                pcall(function()
-                    game:GetService("ReplicatedStorage").KickStone:InvokeServer(true)
-                end)
-                wait(0.1)
-            end
-        end
-        
-        if brick > 0 then
-            pcall(function()
-                game:GetService("ReplicatedStorage").Place:InvokeServer(workspace.Floors.Base.Example.Part)
-            end)
-        end
+        wait(0.1)
     end)
 end
 
 local function stopAutoFarm()
     autoFarmEnabled = false
+    stopRapidE() 
     if farmConnection then
         farmConnection:Disconnect()
         farmConnection = nil
     end
+    currentPhase = "MINING"
 end
-
 Section:NewToggle("Auto Farm", "Enable smart auto farm", function(state)
     if state then
         if maxBackpack == 0 then
@@ -136,25 +183,36 @@ game:GetService("RunService").Heartbeat:Connect(function()
     local stone, brick = getResources()
     local total = stone + brick
     local backpackStatus = ""
+    local farmStatus = currentPhase
+    local eStatus = eHeld and " | E: RAPID FIRE 🔥" or " | E: off"
     
     if maxBackpack > 0 then
-        if isBackpackFull() then
+        if currentPhase == "MINING" then
+            backpackStatus = " | Backpack: " .. total .. "/" .. maxBackpack
+            farmStatus = "⛏️ MINING STONES"
+        elseif currentPhase == "PROCESSING" then
             backpackStatus = " | BACKPACK FULL! ⚠️"
+            farmStatus = "🔄 PROCESSING (RAPID E)"
         else
             backpackStatus = " | Backpack: " .. total .. "/" .. maxBackpack
+            farmStatus = "🏗️ BUILDING ALL BRICKS"
         end
     end
     
-    resourceText = "Stones: " .. stone .. " | Bricks: " .. brick .. backpackStatus
+    resourceText = "Stones: " .. stone .. " | Bricks: " .. brick .. backpackStatus .. " | " .. farmStatus .. eStatus
     resourceLabel:UpdateLabel(resourceText)
 end)
 
 local ManualSection = Tab:NewSection("Manual Controls")
 
-ManualSection:NewButton("TP to Saw + E", "Teleport to saw coordinates and press E", function()
+ManualSection:NewButton("Start Rapid E at Saw", "Teleport to saw and RAPID E", function()
     if teleportToSawCoordinates() then
-        pressE()
+        startRapidE()
     end
+end)
+
+ManualSection:NewButton("Stop Rapid E", "Stop rapid E", function()
+    stopRapidE()
 end)
 
 ManualSection:NewButton("TP to Stone", "Teleport to stone", function()
@@ -173,4 +231,4 @@ ManualSection:NewButton("Build Part", "Build part", function()
     end)
 end)
 
-print("AutoFarm loaded! Set max backpack capacity first.")
+print ("it was hot fix if not work im idk")
