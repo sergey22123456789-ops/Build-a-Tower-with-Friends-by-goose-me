@@ -254,4 +254,6 @@ ManualSection:NewButton("Build Part", "Build part", function()
     end)
 end)
 
-print("AutoFarm loaded! Set max backpack capacity first.")
+while wait() do
+workspace.Saws.Saws:GetChildren()[7].Use.UsePP.Enabled = true
+end)
