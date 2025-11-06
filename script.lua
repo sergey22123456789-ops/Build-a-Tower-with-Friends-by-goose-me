@@ -4,24 +4,29 @@ local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Roboj
 -- Create UI Window
 local Window = Library.CreateLib("AutoFarm", "RJTheme3")
 
--- Tab
-local Tab = Window:NewTab("Main")
-
--- Section
-local Section = Tab:NewSection("Auto Farm Settings")
+-- Main Tab
+local MainTab = Window:NewTab("Main")
+local MainSection = MainTab:NewSection("Auto Farm Settings")
 
 -- Variables
 local autoFarmEnabled = false
 local farmConnection
 local maxBackpack = 0
-local currentPhase = "MINING" -- MINING, PROCESSING, BUILDING
+local currentPhase = "MINING"
 local eHeld = false
 local eConnection
+local bulkBuildAmount = 10
 
 -- Text box for max backpack input
-Section:NewTextBox("Max Backpack", "Enter maximum backpack capacity", function(txt)
+MainSection:NewTextBox("Max Backpack", "Enter maximum backpack capacity", function(txt)
     maxBackpack = tonumber(txt) or 0
     print("Max backpack set: " .. maxBackpack)
+end)
+
+-- Text box for bulk build amount
+MainSection:NewTextBox("Bulk Build Amount", "How many bricks to build at once (10-20)", function(txt)
+    bulkBuildAmount = math.clamp(tonumber(txt) or 10, 1, 50)
+    print("Bulk build amount set: " .. bulkBuildAmount)
 end)
 
 -- Function to get resources
@@ -102,31 +107,45 @@ local function processAllStones()
     
     if stone > 0 then
         if teleportToSawCoordinates() then
-            startRapidE() -- Быстро нажимаем E пока есть камни
-            return true -- Still processing
+            startRapidE()
+            return true
         end
     else
-        stopRapidE() -- Останавливаем когда камней нет
-        currentPhase = "BUILDING" -- Switch to building when no stones left
-        return false -- Done processing
+        stopRapidE()
+        currentPhase = "BUILDING"
+        return false
     end
     return true
 end
 
--- Function to build ALL bricks
+-- Function for ultra-fast bulk building
+local function ultraFastBulkBuild()
+    local Part = workspace.Floors.Base.Parts.Part
+    local PlaceEvent = game:GetService("ReplicatedStorage").Place
+    local stone, brick = getResources()
+    
+    if brick >= bulkBuildAmount then
+        for i = 1, bulkBuildAmount do
+            pcall(function()
+                PlaceEvent:InvokeServer(Part)
+            end)
+        end
+        return true
+    end
+    return false
+end
+
+-- Function to build ALL bricks with bulk method
 local function buildAllBricks()
     local stone, brick = getResources()
     
     if brick > 0 then
-        pcall(function()
-            game:GetService("ReplicatedStorage").Place:InvokeServer(workspace.Floors.Base.Example.Part)
-        end)
-        return true -- Still building
+        ultraFastBulkBuild()
+        return true
     else
-        currentPhase = "MINING" -- Switch back to mining when no bricks left
-        return false -- Done building
+        currentPhase = "MINING"
+        return false
     end
-    return true
 end
 
 -- Main auto farm function
@@ -143,8 +162,7 @@ local function startAutoFarm()
         
         -- Phase logic
         if currentPhase == "MINING" then
-            stopRapidE() -- Останавливаем E при майнинге
-            -- Mine until backpack is full
+            stopRapidE()
             if not isBackpackFull() then
                 if teleportToStone() then
                     pcall(function()
@@ -152,16 +170,14 @@ local function startAutoFarm()
                     end)
                 end
             else
-                currentPhase = "PROCESSING" -- Switch to processing when full
+                currentPhase = "PROCESSING"
             end
             
         elseif currentPhase == "PROCESSING" then
-            -- Process ALL stones first with rapid E
             processAllStones()
             
         elseif currentPhase == "BUILDING" then
-            stopRapidE() -- Останавливаем E при строительстве
-            -- Build ALL bricks
+            stopRapidE()
             buildAllBricks()
         end
         
@@ -172,7 +188,7 @@ end
 -- Stop function
 local function stopAutoFarm()
     autoFarmEnabled = false
-    stopRapidE() -- Останавливаем E при остановке
+    stopRapidE()
     if farmConnection then
         farmConnection:Disconnect()
         farmConnection = nil
@@ -181,7 +197,7 @@ local function stopAutoFarm()
 end
 
 -- Toggle button for auto farm
-Section:NewToggle("Auto Farm", "Enable smart auto farm", function(state)
+MainSection:NewToggle("Auto Farm", "Enable smart auto farm", function(state)
     if state then
         if maxBackpack == 0 then
             Library:Notify("Please set max backpack first!")
@@ -194,9 +210,7 @@ Section:NewToggle("Auto Farm", "Enable smart auto farm", function(state)
 end)
 
 -- Info section
-local InfoSection = Tab:NewSection("Resource Info")
-
--- Label for resource display
+local InfoSection = MainTab:NewSection("Resource Info")
 local resourceText = "Loading..."
 local resourceLabel = InfoSection:NewLabel(resourceText)
 
@@ -207,6 +221,7 @@ game:GetService("RunService").Heartbeat:Connect(function()
     local backpackStatus = ""
     local farmStatus = currentPhase
     local eStatus = eHeld and " | E: RAPID FIRE 🔥" or " | E: off"
+    local buildInfo = " | Bulk: " .. bulkBuildAmount
     
     if maxBackpack > 0 then
         if currentPhase == "MINING" then
@@ -217,16 +232,16 @@ game:GetService("RunService").Heartbeat:Connect(function()
             farmStatus = "🔄 PROCESSING (RAPID E)"
         else
             backpackStatus = " | Backpack: " .. total .. "/" .. maxBackpack
-            farmStatus = "🏗️ BUILDING ALL BRICKS"
+            farmStatus = "🏗️ BULK BUILDING x" .. bulkBuildAmount
         end
     end
     
-    resourceText = "Stones: " .. stone .. " | Bricks: " .. brick .. backpackStatus .. " | " .. farmStatus .. eStatus
+    resourceText = "Stones: " .. stone .. " | Bricks: " .. brick .. backpackStatus .. " | " .. farmStatus .. eStatus .. buildInfo
     resourceLabel:UpdateLabel(resourceText)
 end)
 
 -- Manual controls section
-local ManualSection = Tab:NewSection("Manual Controls")
+local ManualSection = MainTab:NewSection("Manual Controls")
 
 ManualSection:NewButton("Start Rapid E at Saw", "Teleport to saw and RAPID E", function()
     if teleportToSawCoordinates() then
@@ -236,6 +251,10 @@ end)
 
 ManualSection:NewButton("Stop Rapid E", "Stop rapid E", function()
     stopRapidE()
+end)
+
+ManualSection:NewButton("Bulk Build Now", "Build " .. bulkBuildAmount .. " bricks at once", function()
+    ultraFastBulkBuild()
 end)
 
 ManualSection:NewButton("TP to Stone", "Teleport to stone", function()
@@ -250,10 +269,76 @@ end)
 
 ManualSection:NewButton("Build Part", "Build part", function()
     pcall(function()
-        game:GetService("ReplicatedStorage").Place:InvokeServer(workspace.Floors.Base.Example.Part)
+        game:GetService("ReplicatedStorage").Place:InvokeServer(workspace.Floors.Base.Parts.Part)
     end)
 end)
 
-while wait() do
-workspace.Saws.Saws:GetChildren()[7].Use.UsePP.Enabled = true
-end
+-- Teleports Tab
+local TeleportsTab = Window:NewTab("Teleports")
+local TeleportsSection = TeleportsTab:NewSection("Locations")
+
+-- Teleport functions
+TeleportsSection:NewButton("Stone", "Teleport to stone", function()
+    teleportToStone()
+end)
+
+TeleportsSection:NewButton("Saw", "Teleport to saw", function()
+    teleportToSawCoordinates()
+end)
+
+TeleportsSection:NewButton("Base", "Teleport to base", function()
+    local character = game.Players.LocalPlayer.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        character.HumanoidRootPart.CFrame = CFrame.new(0, 5, 0)
+    end
+end)
+
+TeleportsSection:NewButton("Spawn", "Teleport to spawn", function()
+    local character = game.Players.LocalPlayer.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        character.HumanoidRootPart.CFrame = CFrame.new(0, 10, 0)
+    end
+end)
+
+-- Upgrades Tab
+local UpgradesTab = Window:NewTab("Upgrades")
+local UpgradesSection = UpgradesTab:NewSection("Multiplier Upgrades")
+
+-- Upgrade functions
+UpgradesSection:NewButton("Upgrade All Multipliers", "Upgrade Stone, Cutter and Place", function()
+    local Upgrade = game:GetService("ReplicatedStorage").Upgrade
+    for _,upgrade in pairs({"StoneMultiplier","CutterMultiplier","PlaceMultiplier"}) do
+        pcall(function() Upgrade:InvokeServer(upgrade,1e-117,2) end)
+    end
+    Library:Notify("All multipliers upgraded!")
+end)
+
+UpgradesSection:NewButton("Stone Multiplier", "Upgrade stone multiplier", function()
+    pcall(function()
+        game:GetService("ReplicatedStorage").Upgrade:InvokeServer("StoneMultiplier",1e-117,2)
+    end)
+    Library:Notify("Stone multiplier upgraded!")
+end)
+
+UpgradesSection:NewButton("Cutter Multiplier", "Upgrade cutter multiplier", function()
+    pcall(function()
+        game:GetService("ReplicatedStorage").Upgrade:InvokeServer("CutterMultiplier",1e-117,2)
+    end)
+    Library:Notify("Cutter multiplier upgraded!")
+end)
+
+UpgradesSection:NewButton("Place Multiplier", "Upgrade place multiplier", function()
+    pcall(function()
+        game:GetService("ReplicatedStorage").Upgrade:InvokeServer("PlaceMultiplier",1e-117,2)
+    end)
+    Library:Notify("Place multiplier upgraded!")
+end)
+
+-- Enable saw permanently in background
+spawn(function()
+    while wait(0.5) do
+        pcall(function()
+            workspace.Saws.Saws:GetChildren()[7].Use.UsePP.Enabled = true
+        end)
+    end
+end)
